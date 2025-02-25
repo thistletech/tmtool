@@ -88,7 +88,8 @@ pub fn read(device: String, slot: u16) -> Result<()> {
     tm.read_bytes(&mut pk)?;
 
     let pk = &pk[9..73];
-    println!("~~ key {:x?}", pk);
+    println!("~~ key at slot {:#04x}", slot);
+    println!("{:x?}", pk);
 
     Ok(())
 }
@@ -108,8 +109,6 @@ pub fn write(device: String, slot: u16, keypath: PathBuf) -> Result<()> {
     let pk = &pk[27..];
 
     println!("~~ parsed key at {:?}", &keypath);
-
-    // TODO: reset key slot beforehand
 
     let mut tm = trustm::TrustM::init(device)?;
 
@@ -222,7 +221,7 @@ pub fn write(device: String, slot: u16, keypath: PathBuf) -> Result<()> {
     let data = [0x80, 0x81, 0x00, 0x00, 0x56, 0x30];
     tm.write_bytes(&data)?;
 
-    println!("~~ wrote key");
+    println!("~~ key successfuly written to slot {:#04x}", slot);
 
     Ok(())
 }
@@ -232,7 +231,7 @@ pub fn lock(device: String, slot: u16, force: bool) -> Result<()> {
 
     if !force {
         // prompt user to make sure they're sure
-        println!("Are you sure you want to lock the key? This can only be done once per slot.");
+        println!("Are you sure you want to lock the key? This can only be done once per slot. Type 'yes' to proceed.");
         let mut input = String::new();
         std::io::stdin().read_line(&mut input)?;
         if input.trim() != "yes" {
@@ -240,9 +239,116 @@ pub fn lock(device: String, slot: u16, force: bool) -> Result<()> {
         }
     }
 
-    tm.write_byte(slot as u8)?;
+    tm.write_byte(0x82)?;
 
-    // TODO
+    let mut data = [0; 4];
+    tm.read_bytes(&mut data)?;
+
+    let data = [0x88, 0x00, 0x00];
+    tm.write_bytes(&data)?;
+
+    tm.write_byte(0x84)?;
+
+    let mut data = [0; 4];
+    tm.read_bytes(&mut data)?;
+
+    let data = [0x81, 0x01, 0x15];
+    tm.write_bytes(&data)?;
+
+    tm.write_byte(0x81)?;
+
+    let mut data = [0; 2];
+    tm.read_bytes(&mut data)?;
+
+    let data = [
+        0x80, 0x03, 0x00, 0x16, 0x08, 0x20, 0xf0, 0x00, 0x00, 0x10, 0xd2, 0x76, 0x00, 0x00, 0x04,
+        0x47, 0x65, 0x6e, 0x41, 0x75, 0x74, 0x68, 0x41, 0x70, 0x70, 0x6c, 0xbe, 0x40,
+    ];
+    tm.write_bytes(&data)?;
+
+    tm.write_byte(0x82)?;
+
+    let mut data = [0; 4];
+    tm.read_bytes(&mut data)?;
+
+    let mut data = [0; 5];
+    tm.read_bytes(&mut data)?;
+
+    tm.write_byte(0x82)?;
+
+    let mut data = [0; 4];
+    tm.read_bytes(&mut data)?;
+
+    tm.write_byte(0x80)?;
+
+    let mut data = [0; 11];
+    tm.read_bytes(&mut data)?;
+
+    let data = [0x80, 0x80, 0x00, 0x00, 0x0c, 0xec];
+    tm.write_bytes(&data)?;
+
+    let mut data = [
+        0x80, 0x04, 0x00, 0x0f, 0x08, 0x20, 0x82, 0x01, 0x00, 0x09, 0xe0, 0xe9, 0x00, 0x00, 0x20,
+        0x03, 0xd0, 0x01, 0xff, 0x5d, 0xd8,
+    ];
+    if slot == TM_SLOT1 {
+        data[10] = 0xe0;
+        data[11] = 0xe8;
+        data[19] = 0xdc;
+        data[20] = 0x67;
+    } else if slot == TM_SLOT2 {
+        data[10] = 0xe0;
+        data[11] = 0xe9;
+        data[19] = 0x5d;
+        data[20] = 0xd8;
+    }
+
+    tm.write_bytes(&data)?;
+
+    tm.write_byte(0x82)?;
+
+    let mut data = [0; 4];
+    tm.read_bytes(&mut data)?;
+
+    tm.write_byte(0x80)?;
+
+    let mut data = [0; 5];
+    tm.read_bytes(&mut data)?;
+
+    tm.write_byte(0x82)?;
+
+    let mut data = [0; 4];
+    tm.read_bytes(&mut data)?;
+
+    tm.write_byte(0x82)?;
+
+    let mut data = [0; 4];
+    tm.read_bytes(&mut data)?;
+
+    tm.write_byte(0x82)?;
+
+    let mut data = [0; 4];
+    tm.read_bytes(&mut data)?;
+
+    tm.write_byte(0x82)?;
+
+    let mut data = [0; 4];
+    tm.read_bytes(&mut data)?;
+
+    tm.write_byte(0x82)?;
+
+    let mut data = [0; 4];
+    tm.read_bytes(&mut data)?;
+
+    tm.write_byte(0x80)?;
+
+    let mut data = [0; 11];
+    tm.read_bytes(&mut data)?;
+
+    let data = [0x80, 0x81, 0x00, 0x00, 0x56, 0x30];
+    tm.write_bytes(&data)?;
+
+    println!("~~ key at slot {:#04x} is now write-protected", slot);
 
     Ok(())
 }

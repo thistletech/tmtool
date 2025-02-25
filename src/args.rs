@@ -11,9 +11,14 @@ use clap::{Parser, Subcommand};
     version = option_env!("TM_TOOL").unwrap_or("unknown"),
     long_about = None,
     about = "
-TrustM Userland tooling
+TrustM Userland tooling.
+Designed to help integration with Thistle Verified Boot: https://docs.thistle.tech/tvb
+
 This tool can read and write keys to the Infineon TrustM chip.
-Requires a direct i2c connection to the chip.",
+Requires a direct i2c connection to the chip.
+
+Currently limited to reading 64B keys at slots 0xe0e8 and 0xe0e9.
+The key writing operation expects a PEM formatted key file.",
     verbatim_doc_comment,
 )]
 pub struct Args {

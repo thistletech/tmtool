@@ -20,6 +20,6 @@ build-all::
 	echo '```' > builds/buildout
 	echo $(TM_TOOL) >> builds/buildout
 	rustc --version >> builds/buildout
-	sha256sum builds/* >> builds/buildout
+	sha256sum builds/tmtool* >> builds/buildout
 	echo '```' >> builds/buildout
 	cat builds/buildout
