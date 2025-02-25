@@ -1,8 +1,8 @@
-TM_TOOL := $(shell git show -s --format=%cd --date=format:%Y-%m-%d HEAD) / $(shell git rev-parse --short HEAD)
-export TM_TOOL
+TM_TOOL_VERS := $(shell git show -s --format=%cd --date=format:%Y-%m-%d HEAD) / $(shell git rev-parse --short HEAD)
+export TM_TOOL_VERS
 
 build::
-	@echo $(TM_TOOL)
+	@echo $(TM_TOOL_VERS)
 	cargo build
 	cargo clippy --all
 	cargo fmt --all
@@ -18,7 +18,7 @@ build-all::
 	mkdir -p builds
 	cp target/aarch64-unknown-linux-musl/release/tmtool builds/tmtool-aarch64
 	echo '```' > builds/buildout
-	echo $(TM_TOOL) >> builds/buildout
+	echo $(TM_TOOL_VERS) >> builds/buildout
 	rustc --version >> builds/buildout
 	sha256sum builds/tmtool* >> builds/buildout
 	echo '```' >> builds/buildout
