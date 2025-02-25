@@ -20,7 +20,7 @@ fn main() -> Result<()> {
     }
 
     match args.command {
-        args::Cmds::Read(_) => cmds::read(device, key_slot),
+        args::Cmds::Read(p) => cmds::read(device, key_slot, p.raw),
         args::Cmds::Write(p) => cmds::write(device, key_slot, p.key),
         args::Cmds::Lock(p) => cmds::lock(device, key_slot, p.force),
     }

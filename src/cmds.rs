@@ -1,5 +1,6 @@
 extern crate i2cdev;
 
+use std::io::Write;
 use std::path::PathBuf;
 
 use crate::trustm::{self, TM_SLOT1, TM_SLOT2};
@@ -7,7 +8,7 @@ use crate::trustm::{self, TM_SLOT1, TM_SLOT2};
 use anyhow::Result;
 use anyhow::*;
 
-pub fn read(device: String, slot: u16) -> Result<()> {
+pub fn read(device: String, slot: u16, raw: bool) -> Result<()> {
     let mut tm = trustm::TrustM::init(device)?;
 
     tm.write_byte(0x84)?;
@@ -88,8 +89,13 @@ pub fn read(device: String, slot: u16) -> Result<()> {
     tm.read_bytes(&mut pk)?;
 
     let pk = &pk[9..73];
-    println!("~~ key at slot {:#04x}", slot);
-    println!("{:x?}", pk);
+    eprintln!("~~ Key at slot {:#04x}", slot);
+    eprintln!("{:x?}", pk);
+
+    if raw {
+        std::io::stdout().write_all(pk)?;
+        std::io::stdout().flush()?;
+    }
 
     Ok(())
 }
@@ -108,7 +114,7 @@ pub fn write(device: String, slot: u16, keypath: PathBuf) -> Result<()> {
     }
     let pk = &pk[27..];
 
-    println!("~~ parsed key at {:?}", &keypath);
+    eprintln!("~~ Parsed key at {:?}", &keypath);
 
     let mut tm = trustm::TrustM::init(device)?;
 
@@ -221,7 +227,7 @@ pub fn write(device: String, slot: u16, keypath: PathBuf) -> Result<()> {
     let data = [0x80, 0x81, 0x00, 0x00, 0x56, 0x30];
     tm.write_bytes(&data)?;
 
-    println!("~~ key successfuly written to slot {:#04x}", slot);
+    eprintln!("~~ Key successfuly written to slot {:#04x}", slot);
 
     Ok(())
 }
@@ -231,7 +237,7 @@ pub fn lock(device: String, slot: u16, force: bool) -> Result<()> {
 
     if !force {
         // prompt user to make sure they're sure
-        println!("Are you sure you want to lock the key? This can only be done once per slot. Type 'yes' to proceed.");
+        eprintln!("Are you sure you want to lock the key? This can only be done once per slot. Type 'yes' to proceed.");
         let mut input = String::new();
         std::io::stdin().read_line(&mut input)?;
         if input.trim() != "yes" {
@@ -348,7 +354,7 @@ pub fn lock(device: String, slot: u16, force: bool) -> Result<()> {
     let data = [0x80, 0x81, 0x00, 0x00, 0x56, 0x30];
     tm.write_bytes(&data)?;
 
-    println!("~~ key at slot {:#04x} is now write-protected", slot);
+    eprintln!("~~ Key at slot {:#04x} is now write-protected", slot);
 
     Ok(())
 }

@@ -18,15 +18,17 @@ pub struct TrustM {
 
 impl TrustM {
     pub fn init(device: String) -> Result<TrustM> {
-        let dev = LinuxI2CDevice::new(device, TM_ADDR).context("failed init")?;
+        let err = "Failed to init TrustM";
+        let dev = LinuxI2CDevice::new(device, TM_ADDR).context(err)?;
         let mut tm = TrustM { dev };
 
         sleep(Duration::from_micros(100 * 1000));
 
         let data: [u8; 3] = [0x88, 0xff, 0xff]; // reset
-        tm.write_bytes(&data)?;
+        tm.write_bytes(&data).context(err)?;
 
         sleep(Duration::from_micros(100 * 1000));
+        eprintln!("~~ TrustM initinialised");
         Ok(tm)
     }
 
