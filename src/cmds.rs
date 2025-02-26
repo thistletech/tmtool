@@ -90,7 +90,7 @@ pub fn read(device: String, slot: u16, raw: bool) -> Result<()> {
 
     let pk = &pk[9..73];
     eprintln!("~~ Key at slot {:#04x}", slot);
-    eprintln!("{:x?}", pk);
+    eprintln!("{:02x?}", pk);
 
     if raw {
         std::io::stdout().write_all(pk)?;
