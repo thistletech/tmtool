@@ -3,9 +3,19 @@ name = "tmtool"
 version = "0.1.0"
 edition = "2021"
 
+[lib]
+name = "tmtool"
+path = "src/lib.rs"
+
+[[bin]]
+name = "tmtool"
+path = "src/main.rs"
+
 [dependencies]
 anyhow = "1.0.95"
 i2cdev = "0.6.1"
 clap = { version = "4.5.27", features = ["derive"] }
 pem = "=3.0.4"
 base64 = "0.22.1"
+ecdsa = { version = "0.16.9", features = ["der"] }
+p256 = { version = "0.13", features = ["pem"] }

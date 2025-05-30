@@ -7,6 +7,9 @@ build::
 	cargo clippy --all
 	cargo fmt --all
 
+run::
+	cargo run -- verify -s ./sig -f ./pl
+
 ci:: build
 	@echo "done"
 

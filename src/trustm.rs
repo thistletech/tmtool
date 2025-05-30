@@ -1,4 +1,5 @@
 extern crate i2cdev;
+use std::path::PathBuf;
 use std::thread::sleep;
 use std::time::Duration;
 
@@ -17,7 +18,7 @@ pub struct TrustM {
 }
 
 impl TrustM {
-    pub fn init(device: String) -> Result<TrustM> {
+    pub fn init(device: PathBuf) -> Result<TrustM> {
         let err = "Failed to init TrustM";
         let dev = LinuxI2CDevice::new(device, TM_ADDR).context(err)?;
         let mut tm = TrustM { dev };

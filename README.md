@@ -20,10 +20,11 @@ The key writing operation expects a PEM formatted key file.
 Usage: tmtool [OPTIONS] <COMMAND>
 
 Commands:
-  read   Read a key from TrustM
-  write  Write a key to TrustM
-  lock   Write protect a key - warning, you can only do this once per slot !
-  help   Print this message or the help of the given subcommand(s)
+  read    Read a key from TrustM
+  write   Write a key to TrustM
+  lock    Write protect a key - warning, you can only do this once per slot !
+  verify  Verify a p256 signature against a TrustM key
+  help    Print this message or the help of the given subcommand(s)
 
 Options:
       --device <DEVICE>      i2c device path [default: /dev/i2c-1]

@@ -2,8 +2,9 @@ extern crate i2cdev;
 use clap::Parser;
 
 mod args;
-mod cmds;
-mod trustm;
+pub mod trustm;
+
+use std::io::Write;
 
 use anyhow::Result;
 use anyhow::*;
@@ -20,8 +21,37 @@ fn main() -> Result<()> {
     }
 
     match args.command {
-        args::Cmds::Read(p) => cmds::read(device, key_slot, p.raw),
-        args::Cmds::Write(p) => cmds::write(device, key_slot, p.key),
-        args::Cmds::Lock(p) => cmds::lock(device, key_slot, p.force),
-    }
+        args::Cmds::Read(p) => {
+            let pk = tmtool::read_key(device, key_slot)?;
+            if p.raw {
+                std::io::stdout().write_all(&pk)?;
+                std::io::stdout().flush()?;
+            } else {
+                eprintln!("~~ Key at slot {:#04x}", key_slot);
+                eprintln!("{:02x?}", pk);
+            }
+        }
+        args::Cmds::Write(p) => {
+            tmtool::write_key(device, key_slot, p.key)?;
+            eprintln!("~~ Key successfuly written to slot {:#04x}", key_slot);
+        }
+        args::Cmds::Lock(p) => {
+            if !p.force {
+                eprintln!("Are you sure you want to lock the key? This can only be done once per slot. Type 'yes' to proceed.");
+                let mut input = String::new();
+                std::io::stdin().read_line(&mut input)?;
+                if input.trim() != "yes" {
+                    return Err(anyhow!("user aborted"));
+                }
+            }
+            tmtool::lock_keyslot(device, key_slot)?;
+            eprintln!("~~ Key at slot {:#04x} is now write-protected", key_slot);
+        }
+        args::Cmds::Verify(p) => {
+            tmtool::p256_verify(device, key_slot, p.signature, p.payload)?;
+            eprintln!("~~ Signature verified successfully");
+        }
+    };
+
+    Ok(())
 }
