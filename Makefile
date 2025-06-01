@@ -4,13 +4,19 @@ export TM_TOOL_VERS
 build::
 	@echo $(TM_TOOL_VERS)
 	cargo build
+
+lint::
 	cargo clippy --all
 	cargo fmt --all
 
-run::
-	cargo run -- verify -s ./sig -f ./pl
+lint-enforce::
+	cargo fmt --all -- --check
+	cargo clippy --all -- -D warnings
 
-ci:: build
+test::
+	cargo test --all
+
+ci:: build lint-enforce test
 	@echo "done"
 
 release::

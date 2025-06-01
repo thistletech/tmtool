@@ -7,13 +7,25 @@ use std::path::PathBuf;
 
 use std::io::Read;
 
-use anyhow::Result;
-use anyhow::*;
 use p256::ecdsa::{signature::Verifier, Signature, VerifyingKey};
 use p256::elliptic_curve::sec1::FromEncodedPoint;
 use p256::EncodedPoint;
+use thiserror::Error;
 
-pub fn read_key(device: PathBuf, slot: u16) -> Result<Vec<u8>> {
+#[derive(Error, Debug)]
+pub enum TrustMLibError {
+    #[error("trustm device error")]
+    DeviceError {
+        #[from]
+        source: TrustMDeviceError,
+    },
+    #[error("key error")]
+    KeyError(String),
+    #[error("signature error")]
+    VerifyError(String),
+}
+
+pub fn read_key(device: PathBuf, slot: u16) -> Result<Vec<u8>, TrustMLibError> {
     let mut tm = TrustM::init(device)?;
 
     tm.write_byte(0x84)?;
@@ -97,58 +109,25 @@ pub fn read_key(device: PathBuf, slot: u16) -> Result<Vec<u8>> {
     Ok(pk.to_vec())
 }
 
-pub fn p256_verify(
-    device: PathBuf,
-    slot: u16,
-    signature: PathBuf,
-    payload: PathBuf,
-) -> Result<()> {
-    let mut file = std::fs::File::open(payload).context("cant open file to verify")?;
-    let mut toverify = Vec::new();
-    file.read_to_end(&mut toverify)?;
-
-    // read signature from file - raw bytes
-    let mut sig_file = std::fs::File::open(signature).context("cant open signature")?;
-    let mut sig: Vec<u8> = Vec::new();
-    sig_file.read_to_end(&mut sig)?;
-
-    // if device starts by /dev read from trustm, otherwise read from file
-    let pk = if device.starts_with("/dev") {
-        read_key(device, slot)?
-    } else {
-        let mut pk_file = std::fs::File::open(device).context("cant open public key")?;
-        let mut pk: Vec<u8> = Vec::new();
-        pk_file.read_to_end(&mut pk)?;
-        pk
-    };
-
-    // reconstruct key
-    let mut encoded_bytes = [0u8; 65];
-    encoded_bytes[0] = 0x04; // uncompressed point prefix
-    encoded_bytes[1..].copy_from_slice(&pk);
-    let encoded_point = EncodedPoint::from_bytes(encoded_bytes).context("invalid key")?;
-    let public_key = p256::PublicKey::from_encoded_point(&encoded_point).unwrap();
-    let verifying_key = VerifyingKey::from(public_key);
-
-    let signature = Signature::from_slice(&sig).context("invalid signature")?;
-    verifying_key
-        .verify(&toverify, &signature)
-        .context("signature cannot be verified")?;
-
-    Ok(())
-}
-
-pub fn write_key(device: PathBuf, slot: u16, keypath: PathBuf) -> Result<()> {
+pub fn write_key(device: PathBuf, slot: u16, keypath: PathBuf) -> Result<(), TrustMLibError> {
     if !keypath.exists() {
-        return Err(anyhow!("key file not found"));
+        return Err(TrustMLibError::KeyError(format!(
+            "key file does not exist: {}",
+            keypath.display()
+        )));
     }
 
     // Transform PEM to DER using
-    let key = std::fs::read(&keypath)?;
-    let pem = pem::parse(key).context("invalid key")?;
+    let key = std::fs::read(&keypath)
+        .map_err(|e| TrustMLibError::KeyError(format!("failed to read key file: {}", e)))?;
+    let pem = pem::parse(key)
+        .map_err(|e| TrustMLibError::KeyError(format!("failed to parse PEM: {}", e)))?;
     let pk = pem.contents();
     if pk.len() < 74 {
-        return Err(anyhow!("invalid key length"));
+        return Err(TrustMLibError::KeyError(format!(
+            "key file is too short, expected at least 74 bytes, got {}",
+            pk.len()
+        )));
     }
     let pk = &pk[27..];
 
@@ -266,7 +245,7 @@ pub fn write_key(device: PathBuf, slot: u16, keypath: PathBuf) -> Result<()> {
     Ok(())
 }
 
-pub fn lock_keyslot(device: PathBuf, slot: u16) -> Result<()> {
+pub fn lock_keyslot(device: PathBuf, slot: u16) -> Result<(), TrustMLibError> {
     let mut tm = TrustM::init(device)?;
 
     tm.write_byte(0x82)?;
@@ -381,6 +360,62 @@ pub fn lock_keyslot(device: PathBuf, slot: u16) -> Result<()> {
     Ok(())
 }
 
+pub fn p256_verify(
+    device: PathBuf,
+    slot: u16,
+    signature: PathBuf,
+    payload: PathBuf,
+) -> Result<(), TrustMLibError> {
+    let mut file = std::fs::File::open(payload)
+        .map_err(|e| TrustMLibError::VerifyError(format!("failed to open payload file: {}", e)))?;
+    let mut toverify = Vec::new();
+    file.read_to_end(&mut toverify)
+        .map_err(|e| TrustMLibError::VerifyError(format!("failed to read payload file: {}", e)))?;
+
+    // read signature from file - raw bytes
+    let mut sig_file = std::fs::File::open(signature).map_err(|e| {
+        TrustMLibError::VerifyError(format!("failed to open signature file: {}", e))
+    })?;
+    let mut sig: Vec<u8> = Vec::new();
+    sig_file.read_to_end(&mut sig).map_err(|e| {
+        TrustMLibError::VerifyError(format!("failed to read signature file: {}", e))
+    })?;
+
+    // if device starts by /dev read from trustm, otherwise read from file
+    let pk = if device.starts_with("/dev") {
+        read_key(device, slot)?
+    } else {
+        let mut pk_file = std::fs::File::open(device).map_err(|e| {
+            TrustMLibError::VerifyError(format!("failed to open public key file: {}", e))
+        })?;
+        let mut pk: Vec<u8> = Vec::new();
+        pk_file.read_to_end(&mut pk).map_err(|e| {
+            TrustMLibError::VerifyError(format!("failed to read public key file: {}", e))
+        })?;
+        pk
+    };
+
+    // reconstruct key
+    let mut encoded_bytes = [0u8; 65];
+    encoded_bytes[0] = 0x04; // uncompressed point prefix
+    encoded_bytes[1..].copy_from_slice(&pk);
+    let encoded_point = EncodedPoint::from_bytes(encoded_bytes)
+        .map_err(|e| TrustMLibError::VerifyError(format!("failed to parse public key: {}", e)))?;
+    let public_key = p256::PublicKey::from_encoded_point(&encoded_point).unwrap();
+    let verifying_key = VerifyingKey::from(public_key);
+
+    // parse signature
+    let signature = Signature::from_slice(&sig)
+        .map_err(|e| TrustMLibError::VerifyError(format!("failed to parse signature: {}", e)))?;
+
+    // verify signature
+    verifying_key.verify(&toverify, &signature).map_err(|e| {
+        TrustMLibError::VerifyError(format!("signature verification failed: {}", e))
+    })?;
+
+    Ok(())
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -388,6 +423,12 @@ mod tests {
     #[test]
     fn test_verify() {
         let slot = TM_SLOT1;
-        p256_verify(PathBuf::from("./test-vectors/pk.raw"), slot, PathBuf::from("./test-vectors/sig"), PathBuf::from("./test-vectors/pl")).unwrap();
+        p256_verify(
+            PathBuf::from("./test-vectors/pk.raw"),
+            slot,
+            PathBuf::from("./test-vectors/sig"),
+            PathBuf::from("./test-vectors/pl"),
+        )
+        .unwrap();
     }
 }
