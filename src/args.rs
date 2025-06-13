@@ -24,7 +24,7 @@ The key writing operation expects a PEM formatted key file.",
 pub struct Args {
     /// i2c device path
     #[clap(long, default_value = "/dev/i2c-1")]
-    pub device: String,
+    pub device: PathBuf,
 
     /// Trust M key slot to use
     #[clap(long, default_value = "0xe0e8")]
@@ -48,6 +48,26 @@ pub enum Cmds {
     #[clap(display_order = 3)]
     /// Write protect a key - warning, you can only do this once per slot !
     Lock(LockCmd),
+
+    #[clap(display_order = 4)]
+    /// Verify a p256 signature against a TrustM key
+    Verify(VerifyCmd),
+}
+
+#[derive(clap::Args)]
+pub struct VerifyCmd {
+    /// Path of signature
+    #[clap(short, long)]
+    pub signature: PathBuf,
+
+    /// Path of file to verify
+    #[clap(short, long)]
+    pub payload: PathBuf,
+
+    /// Path of public key to verify against (optional testing feature)
+    /// If not provided, the key will be read from the TrustM chip.
+    #[clap(short, long)]
+    pub key_from_file: Option<PathBuf>,
 }
 
 #[derive(clap::Args)]

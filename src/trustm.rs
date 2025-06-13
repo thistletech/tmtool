@@ -1,11 +1,12 @@
 extern crate i2cdev;
+use std::path::PathBuf;
 use std::thread::sleep;
 use std::time::Duration;
 
 use crate::i2cdev::core::I2CDevice;
-use anyhow::Result;
-use anyhow::*;
 use i2cdev::linux::*;
+
+use thiserror::Error;
 
 pub const TM_ADDR: u16 = 0x30;
 
@@ -16,23 +17,39 @@ pub struct TrustM {
     dev: LinuxI2CDevice,
 }
 
+#[derive(Error, Debug)]
+pub enum TrustMDeviceError {
+    #[error("can not init")]
+    CantInit(&'static str),
+    #[error("can not init device")]
+    CantInitDevice {
+        #[from]
+        source: i2cdev::linux::LinuxI2CError,
+    },
+    #[error("can not write to device")]
+    WriteError,
+    #[error("can not read from device")]
+    ReadEror,
+}
+
 impl TrustM {
-    pub fn init(device: String) -> Result<TrustM> {
-        let err = "Failed to init TrustM";
-        let dev = LinuxI2CDevice::new(device, TM_ADDR).context(err)?;
+    pub fn init(device: PathBuf) -> Result<TrustM, TrustMDeviceError> {
+        let dev = LinuxI2CDevice::new(device, TM_ADDR)
+            .map_err(|e| TrustMDeviceError::CantInitDevice { source: e })?;
+
         let mut tm = TrustM { dev };
 
         sleep(Duration::from_micros(100 * 1000));
 
         let data: [u8; 3] = [0x88, 0xff, 0xff]; // reset
-        tm.write_bytes(&data).context(err)?;
+        tm.write_bytes(&data)
+            .map_err(|_e| TrustMDeviceError::CantInit("can not reset device after init"))?;
 
         sleep(Duration::from_micros(100 * 1000));
-        eprintln!("~~ TrustM initinialised");
         Ok(tm)
     }
 
-    pub fn write_byte(&mut self, b: u8) -> Result<()> {
+    pub fn write_byte(&mut self, b: u8) -> Result<(), TrustMDeviceError> {
         let mut ret;
         for _ in 0..200 {
             ret = self.dev.smbus_write_byte(b);
@@ -42,10 +59,10 @@ impl TrustM {
             }
             sleep(Duration::from_micros(1000)); // delay & retry
         }
-        Err(anyhow!("error writing"))
+        Err(TrustMDeviceError::WriteError)
     }
 
-    pub fn write_bytes(&mut self, b: &[u8]) -> Result<()> {
+    pub fn write_bytes(&mut self, b: &[u8]) -> Result<(), TrustMDeviceError> {
         let mut ret;
         for _ in 0..200 {
             ret = self.dev.write(b);
@@ -55,10 +72,10 @@ impl TrustM {
             }
             sleep(Duration::from_micros(1000)); // delay & retry
         }
-        Err(anyhow!("error writing"))
+        Err(TrustMDeviceError::WriteError)
     }
 
-    pub fn read_bytes(&mut self, b: &mut [u8]) -> Result<()> {
+    pub fn read_bytes(&mut self, b: &mut [u8]) -> Result<(), TrustMDeviceError> {
         let mut ret;
         for _ in 0..200 {
             ret = self.dev.read(b);
@@ -68,6 +85,6 @@ impl TrustM {
             }
             sleep(Duration::from_micros(1000)); // delay & retry
         }
-        Err(anyhow!("error reading"))
+        Err(TrustMDeviceError::ReadEror)
     }
 }
