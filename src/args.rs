@@ -63,6 +63,11 @@ pub struct VerifyCmd {
     /// Path of file to verify
     #[clap(short, long)]
     pub payload: PathBuf,
+
+    /// Path of public key to verify against (optional testing feature)
+    /// If not provided, the key will be read from the TrustM chip.
+    #[clap(short, long)]
+    pub key_from_file: Option<PathBuf>,
 }
 
 #[derive(clap::Args)]

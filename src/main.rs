@@ -48,7 +48,14 @@ fn main() -> Result<()> {
             eprintln!("~~ Key at slot {:#04x} is now write-protected", key_slot);
         }
         args::Cmds::Verify(p) => {
-            tmtool::p256_verify(device, key_slot, p.signature, p.payload)?;
+            match p.key_from_file {
+                None => {
+                    tmtool::p256_verify(device, Some(key_slot), p.signature, p.payload)?;
+                }
+                Some(key_path) => {
+                    tmtool::p256_verify(key_path, None, p.signature, p.payload)?;
+                }
+            };
             eprintln!("~~ Signature verified successfully");
         }
     };

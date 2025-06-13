@@ -361,8 +361,8 @@ pub fn lock_keyslot(device: PathBuf, slot: u16) -> Result<(), TrustMLibError> {
 }
 
 pub fn p256_verify(
-    device: PathBuf,
-    slot: u16,
+    key: PathBuf,
+    slot: Option<u16>,
     signature: PathBuf,
     payload: PathBuf,
 ) -> Result<(), TrustMLibError> {
@@ -381,18 +381,19 @@ pub fn p256_verify(
         TrustMLibError::VerifyError(format!("failed to read signature file: {}", e))
     })?;
 
-    // if device starts by /dev read from trustm, otherwise read from file
-    let pk = if device.starts_with("/dev") {
-        read_key(device, slot)?
-    } else {
-        let mut pk_file = std::fs::File::open(device).map_err(|e| {
-            TrustMLibError::VerifyError(format!("failed to open public key file: {}", e))
-        })?;
-        let mut pk: Vec<u8> = Vec::new();
-        pk_file.read_to_end(&mut pk).map_err(|e| {
-            TrustMLibError::VerifyError(format!("failed to read public key file: {}", e))
-        })?;
-        pk
+    let pk = match slot {
+        Some(s) => read_key(key, s)?,
+        None => {
+            // read key from file
+            let mut pk_file = std::fs::File::open(key).map_err(|e| {
+                TrustMLibError::VerifyError(format!("failed to open public from TrustM: {}", e))
+            })?;
+            let mut pk: Vec<u8> = Vec::new();
+            pk_file.read_to_end(&mut pk).map_err(|e| {
+                TrustMLibError::VerifyError(format!("failed to read public key file: {}", e))
+            })?;
+            pk
+        }
     };
 
     // reconstruct key
@@ -422,10 +423,9 @@ mod tests {
 
     #[test]
     fn test_verify() {
-        let slot = TM_SLOT1;
         p256_verify(
             PathBuf::from("./test-vectors/pk.raw"),
-            slot,
+            None,
             PathBuf::from("./test-vectors/sig"),
             PathBuf::from("./test-vectors/pl"),
         )
